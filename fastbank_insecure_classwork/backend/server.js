@@ -6,9 +6,24 @@ const sqlite3 = require("sqlite3").verbose();
 const crypto = require("crypto");
 const bcrypt = require("bcrypt");
 const csurf = require("csurf");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// General API limiter (e.g. 100 requests per 15 minutes per IP)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 const cspdirectives = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
 
 app.disable("x-powered-by");
