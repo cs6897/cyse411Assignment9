@@ -3,6 +3,10 @@ name: DAST - OWASP ZAP - idor
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+  
 jobs:
   zap_scan_idor:
     runs-on: ubuntu-latest
