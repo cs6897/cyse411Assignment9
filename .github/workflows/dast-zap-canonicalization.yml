@@ -2,7 +2,11 @@ name: DAST - OWASP ZAP - canonicalization-example
 
 on:
   workflow_dispatch:
-
+  
+permissions:
+  contents: read
+  security-events: write
+  
 jobs:
   zap_scan_canonicalization:
     runs-on: ubuntu-latest
