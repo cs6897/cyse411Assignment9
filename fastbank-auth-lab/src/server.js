@@ -11,11 +11,8 @@ const PORT = 3001;
 app.disable("x-powered-by");
 
 app.use((req, res, next) => {
+  res.removeHeader("Content-Security-Policy");
   res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
 
   next();
 });
