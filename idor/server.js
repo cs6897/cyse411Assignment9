@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 
+app.disable("x-powered-by");
+
 app.use(express.json());
 
 // Fake "database"
@@ -41,12 +43,11 @@ app.use(fakeAuth);
 app.get("/orders/:id", (req, res) => {
   const orderId = parseInt(req.params.id, 10);
 
-  const order = orders.find((o) => o.id === orderId);
+  const order = orders.find((o) => o.id === orderId && o.userId === req.user.id);
   if (!order) {
     return res.status(404).json({ error: "Order not found" });
   }
 
-  // BUG: no check that order.userId === req.user.id
   return res.json(order);
 });
 
