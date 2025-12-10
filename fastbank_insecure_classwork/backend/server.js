@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const app = express();
 
 app.disable("x-powered-by");
-app.get("/", (req, res) => {
+app.use((req, res, next) => {
   res.setHeader("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'");
   res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=(), fullscreen=()");
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
