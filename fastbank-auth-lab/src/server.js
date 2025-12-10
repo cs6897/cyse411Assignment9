@@ -65,7 +65,7 @@ function findUser(username) {
 }
 
 // Home API just to show who is logged in
-app.get("/api/me", (req, res) => {
+app.get("/api/me", apiLimiter, (req, res) => {
   const token = req.cookies.session;
   if (!token || !sessions[token]) {
     return res.status(401).json({ authenticated: false });
@@ -82,7 +82,7 @@ app.get("/api/me", (req, res) => {
  * - Session token is simple and predictable
  * - Cookie lacks security flags
  */
-app.post("/api/login", (req, res) => {
+app.post("/api/login", authLimiter, (req, res) => {
   const { username, password } = req.body;
   const user = findUser(username);
 
@@ -113,7 +113,7 @@ app.post("/api/login", (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/logout", (req, res) => {
+app.post("/api/logout", authLimiter, (req, res) => {
   const token = req.cookies.session;
   if (token && sessions[token]) {
     delete sessions[token];
