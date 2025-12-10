@@ -2,7 +2,11 @@ name: DAST - OWASP ZAP Full Scan
 
 on:
   workflow_dispatch:
-
+  
+permissions:
+  contents: read
+  security-events: write
+  
 jobs:
   zap_scan_fastbank:
     runs-on: ubuntu-latest
