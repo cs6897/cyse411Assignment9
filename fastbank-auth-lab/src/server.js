@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
 // bcrypt is installed but NOT used in the vulnerable baseline:
 const bcrypt = require("bcrypt");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 const PORT = 3001;
@@ -25,11 +26,21 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.static("public"));
 
-/**
- * VULNERABLE FAKE USER DB
- * For simplicity, we start with a single user whose password is "password123".
- * In the vulnerable version, we hash with a fast hash (SHA-256-like).
- */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+
 const users = [
   {
     id: 1,
