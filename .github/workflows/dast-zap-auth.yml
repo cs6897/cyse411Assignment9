@@ -24,7 +24,7 @@ jobs:
         working-directory: fastbank-auth-lab
         run: |
           npm start &
-          sleep 40
+          sleep 20
 
       - name: Run OWASP ZAP full scan
         uses: zaproxy/action-full-scan@v0.13.0
