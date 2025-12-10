@@ -4,24 +4,10 @@ const cookieParser = require("cookie-parser");
 const crypto = require("crypto");
 // bcrypt is installed but NOT used in the vulnerable baseline:
 const bcrypt = require("bcrypt");
-const rateLimit = require("express-rate-limit");
+const csurf = require("csurf");
 
 const app = express();
 const PORT = 3001;
-
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
 
 app.disable("x-powered-by");
 
@@ -39,6 +25,13 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
 app.use(express.static("public"));
+
+const csrfProtection = csurf({ cookie: true });
+app.use(csrfProtection)
+
+app.get("/api/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 const users = [
   {
