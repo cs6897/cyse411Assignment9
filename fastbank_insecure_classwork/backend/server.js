@@ -17,7 +17,6 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// General API limiter (e.g. 100 requests per 15 minutes per IP)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
@@ -109,7 +108,7 @@ function auth(req, res, next) {
 // Q4 — AUTH ISSUE 3: Username enumeration.
 // Q4 — AUTH ISSUE 4: Predictable sessionId.
 // ------------------------------------------------------------
-app.post("/login", (req, res) => {
+app.post("/login", authLimiter, (req, res) => {
   const { username, password } = req.body;
 
   const sql = "SELECT id, username, password_hash FROM users WHERE username = ?";
@@ -135,7 +134,7 @@ app.post("/login", (req, res) => {
 // ------------------------------------------------------------
 // /me — clean route, no vulnerabilities
 // ------------------------------------------------------------
-app.get("/me", auth, (req, res) => {
+app.get("/me", apiLimiter, auth, (req, res) => {
   db.get(`SELECT username, email FROM users WHERE id = ${req.user.id}`, (err, row) => {
     res.json(row);
   });
@@ -144,7 +143,7 @@ app.get("/me", auth, (req, res) => {
 // ------------------------------------------------------------
 // Q1 — SQLi in transaction search
 // ------------------------------------------------------------
-app.get("/transactions", auth, (req, res) => {
+app.get("/transactions", apiLimiter, auth, (req, res) => {
   const q = req.query.q || "";
   const sql = `
     SELECT id, amount, description
@@ -162,7 +161,7 @@ app.get("/transactions", auth, (req, res) => {
 // ------------------------------------------------------------
 // Q2 — Stored XSS + SQLi in feedback insert
 // ------------------------------------------------------------
-app.post("/feedback", auth, (req, res) => {
+app.post("/feedback", apiLimiter, auth, (req, res) => {
   const comment = req.body.comment;
   const userId = req.user.id;
 
@@ -184,7 +183,7 @@ app.post("/feedback", auth, (req, res) => {
   );
 });
 
-app.get("/feedback", auth, (req, res) => {
+app.get("/feedback", apiLimiter, auth, (req, res) => {
   db.all("SELECT user, comment FROM feedback ORDER BY id DESC", (err, rows) => {
     if (err) return res.status(500).json({ error: "DB error" });
     res.json(rows);
@@ -194,7 +193,7 @@ app.get("/feedback", auth, (req, res) => {
 // ------------------------------------------------------------
 // Q3 — CSRF + SQLi in email update
 // ------------------------------------------------------------
-app.post("/change-email", auth, (req, res) => {
+app.post("/change-email", authLimiter, apiLimiter, (req, res) => {
   const newEmail = req.body.email;
 
   if (!newEmail || !newEmail.includes("@")) return res.status(400).json({ error: "Invalid email" });
