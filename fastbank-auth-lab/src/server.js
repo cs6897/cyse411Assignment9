@@ -73,7 +73,7 @@ app.post("/api/login", (req, res) => {
       .json({ success: false, message: "Invalid username or password" });
   }
 
-  const candidateHash = await bcrypt.compare(password, user.passwordHash);
+  const candidateHash = bcrypt.compare(password, user.passwordHash);
   if (!candidateHash) {
     return res
       .status(401)
