@@ -49,9 +49,6 @@
         return;
       }
 
-      // VULNERABLE: token stored in localStorage
-      localStorage.setItem("session", data.token);
-
       messageEl.textContent = "Login successful!";
       window.location.href = "/home.html";
     });
