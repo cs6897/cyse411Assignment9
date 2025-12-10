@@ -5,17 +5,9 @@ const fs = require('fs');
 const { body, validationResult } = require('express-validator');
 const rateLimit = require("express-rate-limit");
 
-const app = express();
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+const fileLimiter = rateLimit({
+  windowMs: 60 * 1000,   // 1 minute
+  max: 30,               // 30 requests per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -52,6 +44,7 @@ function resolveSafe(baseDir, userInput) {
 // Secure route
 app.post(
   '/read',
+  fileLimiter,
   body('filename')
     .exists().withMessage('filename required')
     .bail()
@@ -79,16 +72,24 @@ app.post(
 );
 
 // Vulnerable route (demo)
-app.post('/read-no-validate', (req, res) => {
+app.post('/read-no-validate', fileLimiter, (req, res) => {
   const filename = req.body.filename || '';
-  const joined = path.join(BASE_DIR, filename); // intentionally vulnerable
-  if (!fs.existsSync(joined)) return res.status(404).json({ error: 'File not found', path: joined });
-  const content = fs.readFileSync(joined, 'utf8');
-  res.json({ path: joined, content });
+
+  const normalized = resolveSafe(BASE_DIR, filename);
+  if (!normalized.startsWith(BASE_DIR + path.sep)) {
+    return res.status(403).json({ error: 'Path traversal detected' });
+  }
+  if (!fs.existsSync(normalized)) {
+    return res.status(404).json({ error: 'File not found', path: normalized });
+  }
+
+  const content = fs.readFileSync(normalized, 'utf8');
+  res.json({ path: normalized, content });
 });
 
+
 // Helper route for samples
-app.post('/setup-sample', (req, res) => {
+app.post('/setup-sample', fileLimiter, (req, res) => {
   const samples = {
     'hello.txt': 'Hello from safe file!\n',
     'notes/readme.md': '# Readme\nSample readme file'
