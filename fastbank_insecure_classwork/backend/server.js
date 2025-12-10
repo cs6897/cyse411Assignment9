@@ -4,9 +4,13 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const sqlite3 = require("sqlite3").verbose();
 const crypto = require("crypto");
+const bcrypt = require("bcrypt");
+const csurf = require("csurf");
 
 const app = express();
+
 const cspdirectives = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'";
+
 app.disable("x-powered-by");
 app.use((req, res, next) => {
   res.setHeader("Content-Security-Policy", cspdirectives);
@@ -28,6 +32,13 @@ app.use(
 
 app.use(bodyParser.json());
 app.use(cookieParser());
+
+const csrfProtection = csurf({ cookie: true });
+app.use(csrfProtection);
+
+app.get("/csrf-token", (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
 // --- IN-MEMORY SQLITE DB (clean) ---
 const db = new sqlite3.Database(":memory:");
@@ -71,10 +82,6 @@ db.serialize(() => {
 // --- SESSION STORE (simple, predictable token exactly like assignment) ---
 const sessions = {};
 
-function fastHash(pwd) {
-  return crypto.createHash("sha256").update(pwd).digest("hex");
-}
-
 function auth(req, res, next) {
   const sid = req.cookies.sid;
   if (!sid || !sessions[sid]) return res.status(401).json({ error: "Not authenticated" });
@@ -90,18 +97,18 @@ function auth(req, res, next) {
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  const sql = `SELECT id, username, password_hash FROM users WHERE username = '${username}'`;
+  const sql = "SELECT id, username, password_hash FROM users WHERE username = ?";
 
-  db.get(sql, (err, user) => {
-    if (!user) return res.status(404).json({ error: "Unknown username" });
+  db.get(sql, [username], (err, user) => {
+    if (!user) return res.status(404).json({ error: "DB error" });
 
-    const candidate = fastHash(password);
-    if (candidate !== user.password_hash) {
-      return res.status(401).json({ error: "Wrong password" });
+    const ok = bcrypt.compareSync(password, user.password_hash);
+    if (!ok) {
+      return res.status(401).json({ error: "Invalid username or password" });
     }
 
-    const sid = `${username}-${Date.now()}`; // predictable
-    sessions[sid] = { userId: user.id };
+    const sid = crypto.randomBytes(32).toString("hex");
+    sessions[sid] = { userId: user.id, createdAt: Date.now() };
 
     // Cookie is intentionally “normal” (not HttpOnly / secure)
     res.cookie("sid", sid, {});
@@ -127,11 +134,14 @@ app.get("/transactions", auth, (req, res) => {
   const sql = `
     SELECT id, amount, description
     FROM transactions
-    WHERE user_id = ${req.user.id}
-      AND description LIKE '%${q}%'
+    WHERE user_id = ?
+      AND description LIKE ?
     ORDER BY id DESC
   `;
-  db.all(sql, (err, rows) => res.json(rows));
+  db.all(sql, [req.user.id, `%${q}%`], (err, rows) => {
+    if (err) return res.status(500).json({ error: "DB error" });
+    res.json(rows);
+  });
 });
 
 // ------------------------------------------------------------
@@ -141,21 +151,27 @@ app.post("/feedback", auth, (req, res) => {
   const comment = req.body.comment;
   const userId = req.user.id;
 
-  db.get(`SELECT username FROM users WHERE id = ${userId}`, (err, row) => {
-    const username = row.username;
+  db.get(
+    "SELECT username FROM users WHERE id = ?",
+    [userId],
+    (err, row) => {
+      if (err || !row) return res.status(500).json({ error: "DB error" });
 
-    const insert = `
-      INSERT INTO feedback (user, comment)
-      VALUES ('${username}', '${comment}')
-    `;
-    db.run(insert, () => {
-      res.json({ success: true });
-    });
-  });
+      const insert = `
+        INSERT INTO feedback (user, comment)
+        VALUES (?, ?)
+      `;
+      db.run(insert, [row.username, comment], (runErr) => {
+        if (runErr) return res.status(500).json({ error: "DB error" });
+        res.json({ success: true });
+      });
+    }
+  );
 });
 
 app.get("/feedback", auth, (req, res) => {
   db.all("SELECT user, comment FROM feedback ORDER BY id DESC", (err, rows) => {
+    if (err) return res.status(500).json({ error: "DB error" });
     res.json(rows);
   });
 });
@@ -166,12 +182,11 @@ app.get("/feedback", auth, (req, res) => {
 app.post("/change-email", auth, (req, res) => {
   const newEmail = req.body.email;
 
-  if (!newEmail.includes("@")) return res.status(400).json({ error: "Invalid email" });
+  if (!newEmail || !newEmail.includes("@")) return res.status(400).json({ error: "Invalid email" });
 
-  const sql = `
-    UPDATE users SET email = '${newEmail}' WHERE id = ${req.user.id}
-  `;
-  db.run(sql, () => {
+  const sql = "UPDATE users SET email = ? WHERE id = ?";
+  db.run(sql, [newEmail, req.user.id], (err) => {
+    if (err) return res.status(500).json({ error: "DB error" });
     res.json({ success: true, email: newEmail });
   });
 });
