@@ -3,6 +3,10 @@ name: DAST - OWASP ZAP - fastbank-auth-lab
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+  
 jobs:
   zap_scan_auth:
     runs-on: ubuntu-latest
