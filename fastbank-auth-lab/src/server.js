@@ -8,6 +8,8 @@ const bcrypt = require("bcrypt");
 const app = express();
 const PORT = 3001;
 
+app.disable("x-powered-by");
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cookieParser());
@@ -22,8 +24,7 @@ const users = [
   {
     id: 1,
     username: "student",
-    // VULNERABLE: fast hash without salt
-    passwordHash: fastHash("password123") // students must replace this scheme with bcrypt
+    passwordHash: bcrypt.hashSync("password123", 10)
   }
 ];
 
@@ -34,9 +35,9 @@ const sessions = {}; // token -> { userId }
  * VULNERABLE FAST HASH FUNCTION
  * Students MUST STOP using this and replace logic with bcrypt.
  */
-function fastHash(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
+// function fastHash(password) {
+//   return crypto.createHash("sha256").update(password).digest("hex");
+// }
 
 // Helper: find user by username
 function findUser(username) {
@@ -69,29 +70,27 @@ app.post("/api/login", (req, res) => {
     // VULNERABLE: username enumeration via message
     return res
       .status(401)
-      .json({ success: false, message: "Unknown username" });
+      .json({ success: false, message: "Invalid username or password" });
   }
 
-  const candidateHash = fastHash(password);
-  if (candidateHash !== user.passwordHash) {
+  const candidateHash = await bcrypt.compare(password, user.passwordHash);
+  if (!candidateHash) {
     return res
       .status(401)
-      .json({ success: false, message: "Wrong password" });
+      .json({ success: false, message: "Invalid username or password" });
   }
 
-  // VULNERABLE: predictable token
-  const token = username + "-" + Date.now();
+  const token = crypto.randomBytes(32).toString("hex");
 
-  // VULNERABLE: session stored without expiration
-  sessions[token] = { userId: user.id };
+  sessions[token] = { userId: user.id, createdAt: Date.now() };
 
-  // VULNERABLE: cookie without httpOnly, secure, sameSite
   res.cookie("session", token, {
-    // students must add: httpOnly: true, secure: true, sameSite: "lax"
+    httpOnly: true, 
+    secure: true, 
+    sameSite: "lax"
   });
 
-  // Client-side JS (login.html) will store this token in localStorage (vulnerable)
-  res.json({ success: true, token });
+  res.json({ success: true });
 });
 
 app.post("/api/logout", (req, res) => {
