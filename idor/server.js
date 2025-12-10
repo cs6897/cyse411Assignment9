@@ -55,7 +55,7 @@ function fakeAuth(req, res, next) {
 app.use(fakeAuth);
 
 // VULNERABLE endpoint: no ownership check (IDOR)
-app.get("/orders/:id", (req, res) => {
+app.get("/orders/:id", apiLimiter, (req, res) => {
   const orderId = parseInt(req.params.id, 10);
 
   const order = orders.find((o) => o.id === orderId && o.userId === req.user.id);
